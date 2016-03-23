@@ -86,12 +86,12 @@
         _zFar = 1000;
 
         CGSize size = self.glkView.bounds.size;
-        CGFloat aspect = size.width/size.height;
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        if(size.width <= size.height) //aspect<=1
-            glOrthof(_left, _right, _bottom/aspect, _top*aspect, _zNear, _zFar);
-        else //width>height, aspect>1
+        CGFloat aspect = size.width/size.height;
+        if(size.width <= size.height){ //aspect<=1
+            glOrthof(_left, _right, _bottom/aspect, _top/aspect, _zNear, _zFar);
+        }else //width>height, aspect>1
             glOrthof(_left*aspect, _right*aspect, _bottom, _top, _zNear, _zFar);
         
         glMatrixMode(GL_MODELVIEW);
@@ -138,7 +138,7 @@
     glEnableClientState(GL_VERTEX_ARRAY);
     glColor4f(1, 0, 0, 1);
     float isoValue = 1.0;
-    float gridSize = 0.05;
+    float gridSize = 0.025;
     MarchingCube(isoValue, gridSize, -1, 1, -1, 1, -1, 1);
 }
 

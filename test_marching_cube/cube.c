@@ -11,72 +11,98 @@
 #include <math.h>
 #include <OpenGLES/ES1/gl.h>
 
-float metaball(float x, float y, float z)
-{
-    const float goo = 1.5; //"goo" value of metaball model
-
-    const int NUM_METABALLS = 2;
-    const float S[2] = {0.4, 0.2};
-//    const XYZ P[2] = {{0.15, -0.5, 0.5}, {0.3, 0.3, 0.2}};
-    const XYZ P[2] = {{0, 0, 0}, {0.6, 0.7 -0.2}};
-
-    float value = 0;
-    for(int i=0; i<NUM_METABALLS; i++){
-        float dist = distance(x, y, z, P[i].x, P[i].y, P[i].z);
-        float v = (dist <= S[i]) ? 1.0 : S[i]/pow(dist, goo);
-//        float v = (dist <= S[i]) ? 1.0 : S[i]/dist;
-        value += v;
-    }
-    return  value;
-}
 
 
-
-#define ABS(x) (x>=0 ? (x) : (-x))
-#define EPSILION 0.00001
-
-/*
- Linearly interpolate the position where an isosurface cuts
- an edge between two vertices, each with their own scalar value
- P:=(isovalue-v0)/(v1-v0)*(P1-P0)+P0
+/**
+ * @summary
+ * Divide the space within the bounds into an arbitray number of cubes.
+ * Test the corner of every cube for whether they are inside or outside the object. For every cube
+ * where some corners are inside and some corners are outside the object, the surface must pass through that cube, intersecting the edges of the cube in between corners of opposite classification.
+ *
+ * @parameter gridSize
+ * @parameter bounds of cube(u0,u1,v0,v1,w0,w1)
  */
-XYZ VertexInterplate(float isolevel,XYZ P1, XYZ P2,float v0, float v1)
+void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, float Y1, float Z0, float Z1)
 {
-    if (ABS(isolevel-v0) < EPSILION)
-        return(P1);
-    if (ABS(isolevel-v1) < EPSILION)
-        return(P2);
-    if (ABS(v0-v1) < EPSILION)
-        return(P1);
-    float mu = (isolevel - v0) / (v1 - v0);
-    XYZ p;
-    p.x = P1.x + mu * (P2.x - P1.x);
-    p.y = P1.y + mu * (P2.y - P1.y);
-    p.z = P1.z + mu * (P2.z - P1.z);
-    
-    return(p);
+    const float dx = X1-X0;
+    const float dy = Y1-Y0;
+    const float dz = Z1-Z0;
+    const int xcount = dx/gridSize;
+    const int ycount = dy/gridSize;
+    const int zcount = dz/gridSize;
+    for(int i=0; i<xcount; i++){
+        const float cx0 = X0+i*gridSize;
+        for(int j=0; j<ycount; j++){
+            const float cy0 = Y0+j*gridSize;
+            for(int k=0; k<zcount; k++){
+                //process cube [x, y, z]--[x+gridSize, y+gridSize, z+gridSize]
+                const float cz0 = Z0+k*gridSize;
+                GRIDCELL grid;
+                //build grid with 8 vertices
+                grid.p[0].x = cx0;
+                grid.p[0].y = cy0;
+                grid.p[0].z = cz0;
+                
+                grid.p[1].x = cx0+gridSize;
+                grid.p[1].y = cy0;
+                grid.p[1].z = cz0;
+                
+                grid.p[2].x = cx0+gridSize;
+                grid.p[2].y = cy0+gridSize;
+                grid.p[2].z = cz0;
+                
+                grid.p[3].x = cx0;
+                grid.p[3].y = cy0+gridSize;
+                grid.p[3].z = cz0;
+                
+                grid.p[4].x = cx0;
+                grid.p[4].y = cy0;
+                grid.p[4].z = cz0+gridSize;
+                
+                grid.p[5].x = cx0+gridSize;
+                grid.p[5].y = cy0;
+                grid.p[5].z = cz0+gridSize;
+                
+                grid.p[6].x = cx0+gridSize;
+                grid.p[6].y = cy0+gridSize;
+                grid.p[6].z = cz0+gridSize;
+                
+                grid.p[7].x = cx0;
+                grid.p[7].y = cy0+gridSize;
+                grid.p[7].z = cz0+gridSize;
+                for(int n=0; n<8; n++){ //calculate grid.val[0..7] at location grid.p[0..7]
+                    grid.val[n] = metaball(grid.p[n].x, grid.p[n].y, grid.p[n].z);
+                }
+                TRIANGLE triangles[5]; //out
+                int numTriangles = Polygonise(grid, isolevel, triangles);
+                //TODO draw triangles
+                drawTriangles(numTriangles, triangles);
+            }
+        }
+    }
 }
+
 
 
 
 /**
  @SUMMARY
-     Given a grid cell and an isolevel, calculate the triangular
-     facets required to represent the isosurface through the cell.
-     Return the number of triangular facets, the array "triangles"
-     will be loaded up with the vertices at most 5 triangular facets.
-        0 will be returned if the grid cell is either totally above
-     of totally below the isolevel.
+ Given a grid cell and an isolevel, calculate the triangular
+ facets required to represent the isosurface through the cell.
+ Return the number of triangular facets, the array "triangles"
+ will be loaded up with the vertices at most 5 triangular facets.
+ 0 will be returned if the grid cell is either totally above
+ of totally below the isolevel.
  @PARAMETER grid (__in)
-    one grid in the space with location and values of 8 vertices
+ one grid in the space with location and values of 8 vertices
  @PARAMETER isolevel (__in)
-    the threshold value
+ the threshold value
  @PARAMETER triangles (__out)
-    the resulting triangles
-    每个cube最多生成5个三角形
+ the resulting triangles
+ 每个cube最多生成5个三角形
  @RETURN
-    the number of trianglular facets
-    0 will be returned if the grid cell is either totally above or totally below the isolevel
+ the number of trianglular facets
+ 0 will be returned if the grid cell is either totally above or totally below the isolevel
  */
 int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
 {
@@ -119,8 +145,8 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
     //每个cube最多可以生成5个三角形，每个三角形有3个顶点，故最多可以有三角形顶点：3*5=15个，
     //最后增加一个－1为三角形列表截至标志，故需要15+1=16项
     //trianglesTable每项为在12条边的索引
-    int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
-    {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, /*trianglesTable[cubeIndex==0]*/
+    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
+    {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, /*cubIndex==0*/
         {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
         {0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
         {1, 8, 3, 9, 8, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -398,29 +424,29 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
     
     /* Find the vertices where the surface intersects the cube */
     XYZ vertlist[12]; //12 intersecting on 12 edges of this cube
-    if (edgeindex & 1) //e0: 2^0==1<<0
+    if (edgeindex & 1) //e0: (v0, v1)
         vertlist[0] = VertexInterplate(isolevel,grid.p[0],grid.p[1],grid.val[0],grid.val[1]);
-    if (edgeindex & 2) //e1: 2^1==1<<1
+    if (edgeindex & 2) //e1: (v1, v2)
         vertlist[1] = VertexInterplate(isolevel,grid.p[1],grid.p[2],grid.val[1],grid.val[2]);
-    if (edgeindex & 4) //e2: 2^2==1<<2
+    if (edgeindex & 4) //e2: (v2, v3)
         vertlist[2] = VertexInterplate(isolevel,grid.p[2],grid.p[3],grid.val[2],grid.val[3]);
-    if (edgeindex & 8)
+    if (edgeindex & 8) //e3: (v3, v0)
         vertlist[3] = VertexInterplate(isolevel,grid.p[3],grid.p[0],grid.val[3],grid.val[0]);
-    if (edgeindex & 16)
+    if (edgeindex & 16) //e4: (v4, v5)
         vertlist[4] = VertexInterplate(isolevel,grid.p[4],grid.p[5],grid.val[4],grid.val[5]);
-    if (edgeindex & 32)
+    if (edgeindex & 32) //e5: (v5, v6)
         vertlist[5] = VertexInterplate(isolevel,grid.p[5],grid.p[6],grid.val[5],grid.val[6]);
-    if (edgeindex & 64)
+    if (edgeindex & 64) //e6: (v6, v7)
         vertlist[6] = VertexInterplate(isolevel,grid.p[6],grid.p[7],grid.val[6],grid.val[7]);
-    if (edgeindex & 128)
+    if (edgeindex & 128) //e7: (v7, v4)
         vertlist[7] = VertexInterplate(isolevel,grid.p[7],grid.p[4],grid.val[7],grid.val[4]);
-    if (edgeindex & 256)
+    if (edgeindex & 256) //e8: (v0, v4)
         vertlist[8] = VertexInterplate(isolevel,grid.p[0],grid.p[4],grid.val[0],grid.val[4]);
-    if (edgeindex & 512)
+    if (edgeindex & 512) //e9: (v1, v5)
         vertlist[9] = VertexInterplate(isolevel,grid.p[1],grid.p[5],grid.val[1],grid.val[5]);
-    if (edgeindex & 1024)//e10: 2^10==1<<10
+    if (edgeindex & 1024)//e10: (v2, v6)
         vertlist[10] = VertexInterplate(isolevel,grid.p[2],grid.p[6],grid.val[2],grid.val[6]);
-    if (edgeindex & 2048) //e11: 2^11==1<<11
+    if (edgeindex & 2048) //e11: (v3, v7)
         vertlist[11] = VertexInterplate(isolevel,grid.p[3],grid.p[7],grid.val[3],grid.val[7]);
     
     /* Create the triangle */
@@ -438,59 +464,59 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
 
 
 
-/**
- * @summary
- * Divide the space within the bounds into an arbitray number of cubes.
- * Test the corner of every cube for whether they are inside or outside the object. For every cube
- * where some corners are inside and some corners are outside the object, the surface must pass through that cube, intersecting the edges of the cube in between corners of opposite classification.
- *
- * @parameter gridSize
- * @parameter bounds of cube(u0,u1,v0,v1,w0,w1)
- */
-void MarchingCube(float isovalue, float gridSize, float X0, float X1, float Y0, float Y1, float Z0, float Z1)
+float metaball(float x, float y, float z)
 {
-    const float du = X1-X0;
-    const float dv = Y1-Y0;
-    const float dw = Z1-Z0;
-    const int numx = du/gridSize;
-    const int numy = dv/gridSize;
-    const int numz = dw/gridSize;
-    for(int i=0; i<numx; i++){
-        const float cx0 = X0+i*gridSize;
-        for(int j=0; j<numy; j++){
-            const float cy0 = Y0+j*gridSize;
-            for(int k=0; k<numz; k++){
-                //process cube [x, y, z]--[x+gridSize, y+gridSize, z+gridSize]
-                const float cz0 = Z0+k*gridSize;
-                int vertexIndex = 0; //vertexIndex=0..7
-                GRIDCELL grid;
-                //build grid with 8 vertices
-                for(int ci=0; ci<2; ci++){ //ci=0..1
-                    for(int cj=0; cj<2; cj++){ //cj=0..1
-                        for(int ck=0; ck<2; ck++){ //ck=0..1
-                            float x1 = cx0+ci*gridSize;
-                            float y1 = cy0+cj*gridSize;
-                            float z1 = cz0+ck*gridSize;
-                            float value = metaball(x1, y1, z1);
-                            grid.p[vertexIndex].x = x1;
-                            grid.p[vertexIndex].y = y1;
-                            grid.p[vertexIndex].z = z1;
-                            grid.val[vertexIndex] = value;
-                            vertexIndex++;
-                        }
-                    }
-                }
-                TRIANGLE triangles[5]; //out
-                int numTriangles = Polygonise(grid, isovalue, triangles);
-                //TODO draw triangles
-                drawTriangles(numTriangles, triangles);
-            }
-        }
+    const float goo = 1.0; //"goo" value of metaball model
+
+    const int NUM_METABALLS = 2;
+    const float S[2] = {0.4, 0.2};
+//    const XYZ P[2] = {{0.15, -0.5, 0.5}, {0.3, 0.3, 0.2}};
+    const XYZ P[2] = {{0, 0, 0}, {0.6, 0.7 -0.2}};
+
+    float value = 0;
+    for(int i=0; i<NUM_METABALLS; i++){
+        float dist = distance(x, y, z, P[i].x, P[i].y, P[i].z);
+        float v = (dist <= S[i]) ? 1.0 : S[i]/pow(dist, goo);
+//        float v = (dist <= S[i]) ? 1.0 : S[i]/dist;
+        value += v;
     }
+    return  value;
 }
+
+
+
+#define ABS(x) (x>=0 ? (x) : (-x))
+#define EPSILION 1e-10
+
+/*
+ Linearly interpolate the position where an isosurface cuts
+ an edge between two vertices, each with their own scalar value
+ P:=(isovalue-v0)/(v1-v0)*(P1-P0)+P0
+ */
+XYZ VertexInterplate(float isolevel,XYZ P0, XYZ P1,float v0, float v1)
+{
+    if (ABS(isolevel-v0) < EPSILION)
+        return(P0);
+    if (ABS(isolevel-v1) < EPSILION)
+        return(P1);
+    if (ABS(v0-v1) < EPSILION)
+        return(P0);
+    float mu = (isolevel - v0) / (v1 - v0);
+    XYZ p;
+    p.x = P0.x + mu * (P1.x - P0.x);
+    p.y = P0.y + mu * (P1.y - P0.y);
+    p.z = P0.z + mu * (P1.z - P0.z);
+    
+    return(p);
+}
+
+
 
 void drawTriangles(int numTriangles, TRIANGLE *triangles)
 {
-    glVertexPointer(3, GL_FLOAT, 0, triangles);
-    glDrawArrays(GL_TRIANGLES, 0, numTriangles*3);
+    if(numTriangles > 0){
+        glVertexPointer(3, GL_FLOAT, 0, triangles);
+        const int numVertices = numTriangles*3;
+        glDrawArrays(GL_TRIANGLES, 0, numVertices);
+    }
 }
