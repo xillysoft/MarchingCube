@@ -38,12 +38,13 @@
     [EAGLContext setCurrentContext:context];
     self.glkView.drawableColorFormat = GLKViewDrawableColorFormatRGBA8888;
     self.glkView.drawableDepthFormat = GLKViewDrawableDepthFormat24;
+    
     self.glkView.delegate = self;
     self.glkView.enableSetNeedsDisplay = YES;
 
     [self initGL];
     self.motionManager = [[CMMotionManager alloc] init];
-    self.motionManager.deviceMotionUpdateInterval = 1.0/5; // 10 fps
+    self.motionManager.deviceMotionUpdateInterval = 1.0/10; // 10 fps
 }
 
 
@@ -52,9 +53,9 @@
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     
-    //    glEnable(GL_CULL_FACE);
-    //    glCullFace(GL_BACK);
-    //    glFrontFace(GL_CCW);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
     
     glClearColor(0, 0.5, 0.5, 1);
     
@@ -138,7 +139,7 @@
     glEnableClientState(GL_VERTEX_ARRAY);
     glColor4f(1, 0, 0, 1);
     float isoValue = 1.0;
-    float gridSize = 0.025;
+    float gridSize = 0.05;
     MarchingCube(isoValue, gridSize, -1, 1, -1, 1, -1, 1);
 }
 

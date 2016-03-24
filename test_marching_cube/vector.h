@@ -11,6 +11,8 @@
 #ifndef vector_h
 #define vector_h
 
+float distanceSquare(float x0, float y0, float z0, float x1, float y1, float z1);
 float distance(float x0, float y0, float z0, float x1, float y1, float z1);
+float Q_rsqrt( float number );
 
 #endif /* vector_h */

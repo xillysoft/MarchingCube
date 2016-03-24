@@ -29,6 +29,6 @@ void MarchingCube(float isovalue, float gridSize, float X0, float X1, float Y0, 
 float metaball(float x, float y, float z);
 int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5]);
 XYZ VertexInterplate(float isolevel,XYZ P1, XYZ P2,float v0, float v1);
-void drawTriangles(int numTriangles, TRIANGLE *triangles);
+void drawTriangles(size_t numTriangles, TRIANGLE *triangles);
 
 #endif /* cube_h */

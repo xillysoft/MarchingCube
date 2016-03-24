@@ -10,8 +10,8 @@
 #include "vector.h"
 #include <math.h>
 #include <OpenGLES/ES1/gl.h>
-
-
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @summary
@@ -30,6 +30,12 @@ void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, 
     const int xcount = dx/gridSize;
     const int ycount = dy/gridSize;
     const int zcount = dz/gridSize;
+    const size_t numTriCapacity = 5000; //must>=5,一个grid最多可能产生5个triangles
+    static TRIANGLE *triangles;
+    if(triangles==NULL)
+        triangles= malloc(sizeof(TRIANGLE)*numTriCapacity);
+    size_t numTriUsed = 0;
+    
     for(int i=0; i<xcount; i++){
         const float cx0 = X0+i*gridSize;
         for(int j=0; j<ycount; j++){
@@ -73,13 +79,20 @@ void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, 
                 for(int n=0; n<8; n++){ //calculate grid.val[0..7] at location grid.p[0..7]
                     grid.val[n] = metaball(grid.p[n].x, grid.p[n].y, grid.p[n].z);
                 }
-                TRIANGLE triangles[5]; //out
-                int numTriangles = Polygonise(grid, isolevel, triangles);
-                //TODO draw triangles
-                drawTriangles(numTriangles, triangles);
+                
+                int numTriangles = Polygonise(grid, isolevel, triangles+numTriUsed);
+                if(numTriangles == 0) //do nothing this loop
+                    continue;
+                numTriUsed += numTriangles;
+                if(numTriCapacity - numTriUsed < 5){ //剩余容量不足以容纳下一个loop（最多能产生5个triangle）
+                    drawTriangles(numTriUsed, triangles);
+                    numTriUsed = 0;
+                }
             }
         }
     }
+    drawTriangles(numTriUsed, triangles);
+//    free(triangles);
 }
 
 
@@ -108,7 +121,7 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
 {
     //edge lookup table edgesIndex:=edgeindex;
     //edgesIndex==0 means this cube is completely inside or outside of the surface (when cubeIndex==0 cubeIndex==255)
-    const int edgeTable[256]={//2^8 vertices ==> 2^12 edges
+    static const int edgeTable[256]={//2^8 vertices:(v7,v6,...,v0) ==> 2^12 edges (e11,e10,...,e0)
         0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
         0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
         0x190, 0x99 , 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,
@@ -145,7 +158,7 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
     //每个cube最多可以生成5个三角形，每个三角形有3个顶点，故最多可以有三角形顶点：3*5=15个，
     //最后增加一个－1为三角形列表截至标志，故需要15+1=16项
     //trianglesTable每项为在12条边的索引
-    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
+    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/ //map: (v7,v6,...,v0)==>{e11,e10,...,e0}
     {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, /*cubIndex==0*/
         {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
         {0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -466,18 +479,26 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
 
 float metaball(float x, float y, float z)
 {
-    const float goo = 1.0; //"goo" value of metaball model
 
     const int NUM_METABALLS = 2;
-    const float S[2] = {0.4, 0.2};
+    const float S[2] = {0.3, 0.2};
 //    const XYZ P[2] = {{0.15, -0.5, 0.5}, {0.3, 0.3, 0.2}};
     const XYZ P[2] = {{0, 0, 0}, {0.6, 0.7 -0.2}};
 
     float value = 0;
     for(int i=0; i<NUM_METABALLS; i++){
+#ifdef  USING_GOO
         float dist = distance(x, y, z, P[i].x, P[i].y, P[i].z);
+//#define USING_GOO
+        const float goo = 1.0; //"goo" value of metaball model
         float v = (dist <= S[i]) ? 1.0 : S[i]/pow(dist, goo);
-//        float v = (dist <= S[i]) ? 1.0 : S[i]/dist;
+#else
+        float disSquare = distanceSquare(x, y, z, P[i].x, P[i].y, P[i].z);
+        float invertDist = Q_rsqrt(disSquare);
+//        float v = (disSquare <= S[i]*S[i]) ? 1.0 : S[i]*invertDist;
+        float v = S[i]*invertDist;
+
+#endif
         value += v;
     }
     return  value;
@@ -492,8 +513,10 @@ float metaball(float x, float y, float z)
  Linearly interpolate the position where an isosurface cuts
  an edge between two vertices, each with their own scalar value
  P:=(isovalue-v0)/(v1-v0)*(P1-P0)+P0
+ mu:=(isolevel-v0)/(v1-v0)
+ P:==mu*(P1-P0)+P0
  */
-XYZ VertexInterplate(float isolevel,XYZ P0, XYZ P1,float v0, float v1)
+inline XYZ VertexInterplate(float isolevel,XYZ P0, XYZ P1,float v0, float v1)
 {
     if (ABS(isolevel-v0) < EPSILION)
         return(P0);
@@ -512,11 +535,11 @@ XYZ VertexInterplate(float isolevel,XYZ P0, XYZ P1,float v0, float v1)
 
 
 
-void drawTriangles(int numTriangles, TRIANGLE *triangles)
+void drawTriangles(size_t numTriangles, TRIANGLE *triangles)
 {
-    if(numTriangles > 0){
-        glVertexPointer(3, GL_FLOAT, 0, triangles);
-        const int numVertices = numTriangles*3;
-        glDrawArrays(GL_TRIANGLES, 0, numVertices);
-    }
+if(numTriangles > 0){
+    glVertexPointer(3, GL_FLOAT, 0, triangles);
+    const int numVertices = numTriangles*3;
+    glDrawArrays(GL_TRIANGLES, 0, numVertices);
+}
 }
