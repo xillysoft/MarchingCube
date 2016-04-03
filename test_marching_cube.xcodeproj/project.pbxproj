@@ -18,6 +18,7 @@
 		61BA840A1CA273A3003442B0 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 61BA84091CA273A3003442B0 /* Default-568h@2x.png */; };
 		61BA840D1CA27A9B003442B0 /* cube.c in Sources */ = {isa = PBXBuildFile; fileRef = 61BA840B1CA27A9B003442B0 /* cube.c */; };
 		61BA840F1CA2B2FC003442B0 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61BA840E1CA2B2FC003442B0 /* CoreMotion.framework */; };
+		61BA84121CA4E4DE003442B0 /* polygonise1.gif in Resources */ = {isa = PBXBuildFile; fileRef = 61BA84111CA4E4DE003442B0 /* polygonise1.gif */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		61BA840B1CA27A9B003442B0 /* cube.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = cube.c; sourceTree = "<group>"; };
 		61BA840C1CA27A9B003442B0 /* cube.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = cube.h; sourceTree = "<group>"; };
 		61BA840E1CA2B2FC003442B0 /* CoreMotion.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework; path = System/Library/Frameworks/CoreMotion.framework; sourceTree = SDKROOT; };
+		61BA84111CA4E4DE003442B0 /* polygonise1.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; name = polygonise1.gif; path = docs/polygonise1.gif; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -75,6 +77,7 @@
 		61BA83C21CA23444003442B0 /* test_marching_cube */ = {
 			isa = PBXGroup;
 			children = (
+				61BA84101CA4E483003442B0 /* docs */,
 				61BA84061CA272F0003442B0 /* vector.h */,
 				61BA84071CA272FF003442B0 /* vector.c */,
 				61BA840B1CA27A9B003442B0 /* cube.c */,
@@ -98,6 +101,14 @@
 				61BA83C41CA23444003442B0 /* main.m */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		61BA84101CA4E483003442B0 /* docs */ = {
+			isa = PBXGroup;
+			children = (
+				61BA84111CA4E4DE003442B0 /* polygonise1.gif */,
+			);
+			name = docs;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,6 +168,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				61BA84121CA4E4DE003442B0 /* polygonise1.gif in Resources */,
 				61BA83D31CA23444003442B0 /* LaunchScreen.storyboard in Resources */,
 				61BA840A1CA273A3003442B0 /* Default-568h@2x.png in Resources */,
 				61BA83D01CA23444003442B0 /* Assets.xcassets in Resources */,

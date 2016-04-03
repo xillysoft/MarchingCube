@@ -27,75 +27,63 @@ void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, 
     const float dx = X1-X0;
     const float dy = Y1-Y0;
     const float dz = Z1-Z0;
-    const int xcount = dx/gridSize;
-    const int ycount = dy/gridSize;
-    const int zcount = dz/gridSize;
-    const size_t numTriCapacity = 5000; //must>=5,一个grid最多可能产生5个triangles
-    static TRIANGLE *triangles;
-    if(triangles==NULL)
-        triangles= malloc(sizeof(TRIANGLE)*numTriCapacity);
-    size_t numTriUsed = 0;
-    
-    for(int i=0; i<xcount; i++){
+    const int xCount = dx/gridSize;
+    const int yCount = dy/gridSize;
+    const int zCount = dz/gridSize;
+   
+    float *gridValues = (float *)malloc(sizeof(float)*(xCount+1)*(yCount+1)*(zCount+1));
+    //pre-calculated values
+    for(int i=0; i<xCount+1; i++){
         const float cx0 = X0+i*gridSize;
-        for(int j=0; j<ycount; j++){
+        for(int j=0; j<yCount+1; j++){
             const float cy0 = Y0+j*gridSize;
-            for(int k=0; k<zcount; k++){
-                //process cube [x, y, z]--[x+gridSize, y+gridSize, z+gridSize]
+            for(int k=0; k<zCount+1; k++){
                 const float cz0 = Z0+k*gridSize;
-                GRIDCELL grid;
-                //build grid with 8 vertices
-                grid.p[0].x = cx0;
-                grid.p[0].y = cy0;
-                grid.p[0].z = cz0;
+                int offset = i+(k*(yCount+1)+j)*(xCount+1);
+                gridValues[offset] = metaball(cx0, cy0, cz0);
                 
-                grid.p[1].x = cx0+gridSize;
-                grid.p[1].y = cy0;
-                grid.p[1].z = cz0;
-                
-                grid.p[2].x = cx0+gridSize;
-                grid.p[2].y = cy0+gridSize;
-                grid.p[2].z = cz0;
-                
-                grid.p[3].x = cx0;
-                grid.p[3].y = cy0+gridSize;
-                grid.p[3].z = cz0;
-                
-                grid.p[4].x = cx0;
-                grid.p[4].y = cy0;
-                grid.p[4].z = cz0+gridSize;
-                
-                grid.p[5].x = cx0+gridSize;
-                grid.p[5].y = cy0;
-                grid.p[5].z = cz0+gridSize;
-                
-                grid.p[6].x = cx0+gridSize;
-                grid.p[6].y = cy0+gridSize;
-                grid.p[6].z = cz0+gridSize;
-                
-                grid.p[7].x = cx0;
-                grid.p[7].y = cy0+gridSize;
-                grid.p[7].z = cz0+gridSize;
-                for(int n=0; n<8; n++){ //calculate grid.val[0..7] at location grid.p[0..7]
-                    grid.val[n] = metaball(grid.p[n].x, grid.p[n].y, grid.p[n].z);
-                }
-                
-                int numTriangles = Polygonise(grid, isolevel, triangles+numTriUsed);
-                if(numTriangles == 0) //do nothing this loop
-                    continue;
-                numTriUsed += numTriangles;
-                if(numTriCapacity - numTriUsed < 5){ //剩余容量不足以容纳下一个loop（最多能产生5个triangle）
-                    drawTriangles(numTriUsed, triangles);
-                    numTriUsed = 0;
-                }
             }
         }
     }
-    drawTriangles(numTriUsed, triangles);
-//    free(triangles);
+    
+    for(int i=0; i<xCount; i++){
+        const float cx0 = X0+i*gridSize;
+        for(int j=0; j<yCount; j++){
+            const float cy0 = Y0+j*gridSize;
+            for(int k=0; k<zCount; k++){
+                const float cz0 = Z0+k*gridSize;
+                int offset = i+(k*(yCount+1)+j)*(xCount+1);
+                
+                GRIDCELL grid;
+                //build grid with 8 vertices, p[0], p[1],..., p[7]
+                int ijkOffset[8][3] = { //8 vertices; 3 elements (di, dj, dk) per vertex
+                    {0, 0, 0}, //p0
+                    {1, 0, 0}, //p1
+                    {1, 1, 0}, //p2
+                    {0, 1, 0}, //p3
+                    {0, 0, 1}, //p4
+                    {1, 0, 1}, //p5
+                    {1, 1, 1}, //p6
+                    {0, 1, 1}  //p7
+                };
+                
+                for(int iVertex=0; iVertex<8; iVertex++){
+                    grid.p[iVertex].x = cx0 + gridSize*ijkOffset[iVertex][0];
+                    grid.p[iVertex].y = cy0 + gridSize*ijkOffset[iVertex][1];
+                    grid.p[iVertex].z = cz0 + gridSize*ijkOffset[iVertex][2];
+                    
+                    grid.val[iVertex] = gridValues[offset + ijkOffset[iVertex][2]*(yCount+1)*(xCount+1) + ijkOffset[iVertex][1]*(xCount+1) +ijkOffset[iVertex][0]];
+                }
+
+                static TRIANGLE triangles[5]; //output triangles
+                int numTriangles = Polygonise(grid, isolevel, triangles);
+                drawTriangles(numTriangles, triangles);
+            }
+        }
+    }
+    
+    free(gridValues);
 }
-
-
 
 
 /**
@@ -158,7 +146,8 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
     //每个cube最多可以生成5个三角形，每个三角形有3个顶点，故最多可以有三角形顶点：3*5=15个，
     //最后增加一个－1为三角形列表截至标志，故需要15+1=16项
     //trianglesTable每项为在12条边的索引
-    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/ //map: (v7,v6,...,v0)==>{e11,e10,...,e0}
+    //map: (v7,v6,...,v0)==>({e11,e10,...,e0});
+    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
     {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, /*cubIndex==0*/
         {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
         {0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -421,14 +410,19 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
      tells us which vertices are inside of the surface
      */
     int cubeindex = 0; //2^8 possible values
-    if (grid.val[0] >= isolevel) cubeindex |= 1;
-    if (grid.val[1] >= isolevel) cubeindex |= 2;
-    if (grid.val[2] >= isolevel) cubeindex |= 4;
-    if (grid.val[3] >= isolevel) cubeindex |= 8;
-    if (grid.val[4] >= isolevel) cubeindex |= 16;
-    if (grid.val[5] >= isolevel) cubeindex |= 32;
-    if (grid.val[6] >= isolevel) cubeindex |= 64;
-    if (grid.val[7] >= isolevel) cubeindex |= 128;
+//    if (grid.val[0] >= isolevel) cubeindex |= 1;
+//    if (grid.val[1] >= isolevel) cubeindex |= 2;
+//    if (grid.val[2] >= isolevel) cubeindex |= 4;
+//    if (grid.val[3] >= isolevel) cubeindex |= 8;
+//    if (grid.val[4] >= isolevel) cubeindex |= 16;
+//    if (grid.val[5] >= isolevel) cubeindex |= 32;
+//    if (grid.val[6] >= isolevel) cubeindex |= 64;
+//    if (grid.val[7] >= isolevel) cubeindex |= 128;
+    for(int k=0; k<8; k++){
+        if(grid.val[k] >= isolevel)
+            cubeindex |= (1<<k);
+    }
+    
     
     /* Cube is entirely in/out of the surface */
     const int edgeindex = edgeTable[cubeindex];
@@ -472,31 +466,46 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
         numTriangles++;
     }
     
+    
+    BOOL bDrawCubeOutline = NO;
+    if(bDrawCubeOutline){ //draw outlines of this cube
+        glColor4f(0.75, 0.75, 0.75, 0.75);
+        glDisable(GL_LIGHTING);
+        glVertexPointer(3, GL_FLOAT, 0, grid.p);
+        glDrawArrays(GL_LINE_LOOP, 0, 4); //v0-v1-v2-v3-
+        glDrawArrays(GL_LINE_LOOP, 4, 4); //v4-v5-v6-v7-
+        int stride = sizeof(grid.p[0])*4;
+        for(int i=0; i<4; i++){
+            glVertexPointer(3, GL_FLOAT, stride, &grid.p[i]); //v0-v4, v1-v5, v2-v6, v3-v7
+            glDrawArrays(GL_LINES, 0, 2);
+        }
+        glEnable(GL_LIGHTING);
+    }
+
+    
+    
     return(numTriangles);
 }
 
 
-
+#define USING_GOO
 float metaball(float x, float y, float z)
 {
 
     const int NUM_METABALLS = 2;
     const float S[2] = {0.3, 0.2};
 //    const XYZ P[2] = {{0.15, -0.5, 0.5}, {0.3, 0.3, 0.2}};
-    const XYZ P[2] = {{0, 0, 0}, {0.6, 0.7 -0.2}};
+    const XYZ P[2] = {{-0.2, -0.2, 0}, {0.6, 0.8 -0.8}};
 
     float value = 0;
     for(int i=0; i<NUM_METABALLS; i++){
 #ifdef  USING_GOO
         float dist = distance(x, y, z, P[i].x, P[i].y, P[i].z);
-//#define USING_GOO
         const float goo = 1.0; //"goo" value of metaball model
-        float v = (dist <= S[i]) ? 1.0 : S[i]/pow(dist, goo);
+        float v = (dist <= S[i]) ? 1.0 : pow(S[i]/dist, goo);
 #else
-        float disSquare = distanceSquare(x, y, z, P[i].x, P[i].y, P[i].z);
-        float invertDist = Q_rsqrt(disSquare);
-//        float v = (disSquare <= S[i]*S[i]) ? 1.0 : S[i]*invertDist;
-        float v = S[i]*invertDist;
+        float dist =distance(x, y, z, P[i].x, P[i].y, P[i].z);
+        float v = (dist<=S[i]) ? 1.0 : S[i]/dist;
 
 #endif
         value += v;
@@ -533,13 +542,56 @@ inline XYZ VertexInterplate(float isolevel,XYZ P0, XYZ P1,float v0, float v1)
     return(p);
 }
 
-
-
-void drawTriangles(size_t numTriangles, TRIANGLE *triangles)
+void drawTriangles(int numTriangles, TRIANGLE *triangles)
 {
-if(numTriangles > 0){
-    glVertexPointer(3, GL_FLOAT, 0, triangles);
-    const int numVertices = numTriangles*3;
-    glDrawArrays(GL_TRIANGLES, 0, numVertices);
+    if(numTriangles > 0){
+        glVertexPointer(3, GL_FLOAT, 0, triangles);
+        const BOOL bLighting = YES;
+        if(! bLighting){
+            const int numVertices = numTriangles*3;
+            glDrawArrays(GL_TRIANGLES, 0, numVertices);
+        }else{
+            for(int iTriangle=0; iTriangle<numTriangles; iTriangle++){
+                XYZ V1 = vectorFromTwoPoints(triangles[iTriangle].p[1], triangles[iTriangle].p[0]); //V1:=P1-P0
+                XYZ V2 = vectorFromTwoPoints(triangles[iTriangle].p[2], triangles[iTriangle].p[1]); //V2:=P2-P1
+                XYZ N = vectorMultiply(V1, V2); //N:=V1*V2
+    //            vectorNormalize(&N); /*使用glEnable(GL_NORMALIZE);*/
+                glNormal3f(N.x, N.y, N.z); //glDisableClientState(GL_NORMAL_ARRAY); must be executed.
+                glDrawArrays(GL_TRIANGLES, iTriangle*3, 3);
+            }
+        }
+    }
 }
+
+//V=P1-P0
+inline XYZ vectorFromTwoPoints(XYZ p1, XYZ p0)
+{
+    XYZ v;
+    v.x = p1.x - p0.x;
+    v.y = p1.y - p0.y;
+    v.z = p1.z - p0.z;
+    return v;
 }
+
+//V=V1xV2
+inline XYZ vectorMultiply(XYZ v1, XYZ v2)
+{
+    XYZ v;
+    v.x = v1.y*v2.z-v2.y*v1.z;
+    v.y = v1.z*v2.x-v2.z*v1.x;
+    v.z = v1.x*v2.y-v2.x*v1.y;
+    return v;
+}
+
+inline void vectorNormalize(XYZ *N)
+{
+    float l = N->x*N->x + N->y*N->y + N->z*N->z;
+    if(l!=0 && l!=1.0){
+        l = sqrt(l);
+        N->x /= l;
+        N->y /= l;
+        N->z /= l;
+    }
+}
+
+

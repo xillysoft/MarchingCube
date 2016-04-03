@@ -44,18 +44,22 @@
 
     [self initGL];
     self.motionManager = [[CMMotionManager alloc] init];
-    self.motionManager.deviceMotionUpdateInterval = 1.0/10; // 10 fps
 }
 
 
 -(void)initGL
 {
+    //Depth Test
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
     
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        glFrontFace(GL_CCW);
+    //Culling Backface
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     glClearColor(0, 0.5, 0.5, 1);
     
@@ -66,6 +70,7 @@
 
 -(void)viewWillAppear:(BOOL)animated
 {
+    self.motionManager.deviceMotionUpdateInterval = 1.0/10.0;
     [self.motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryCorrectedZVertical toQueue:[NSOperationQueue mainQueue] withHandler:^(CMDeviceMotion *motion, NSError *error){
         [self.glkView setNeedsDisplay];
     }];
@@ -104,43 +109,87 @@
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //view(camera) matrix
-    {
-        glLoadIdentity();
-        glTranslatef(0, 0, -_zFar);
-        
-        GLfloat vertices[] = {
-            -1, -1, 0,
-            1, -1, 0,
-            1, 1, 0,
-            -1, 1, 0,
-        };
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(3, GL_FLOAT, 0, vertices);
-        glColor4f(1, 1, 0, 1);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    }
+    glMatrixMode(GL_MODELVIEW);
+    
+    glLoadIdentity();
+//    glTranslatef(0, 0, -_zFar);
+//    {
+//        glDisable(GL_LIGHTING);
+//        GLfloat vertices[] = {
+//            -1, -1, 0,
+//            1, -1, 0,
+//            1, 1, 0,
+//            -1, 1, 0,
+//        };
+//        glEnableClientState(GL_VERTEX_ARRAY);
+//        glVertexPointer(3, GL_FLOAT, 0, vertices);
+//        glColor4f(1, 1, 0, 1);
+//        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+//    }
 
     glLoadIdentity();
     glTranslatef(0, 0, -_zNear);
 
-    glTranslatef(0, 0, -2);
+    {
+        glEnable(GL_LIGHTING);
+        glEnable(GL_NORMALIZE);
+        const GLfloat lightModelAmbient[] = {0.25, 0.25, 0.25, 1};
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lightModelAmbient);
+            
+        glEnable(GL_LIGHT0);
+        const GLfloat light0Position[] = {0, 0, 1, 0}; //vector light, 必须为单位矢量
+        const GLfloat lightAmbient[] = {0, 0, 0, 1};
+        const GLfloat light0Diffuse[] = {0.5, 0.5, 0.5, 1};
+        const GLfloat light0Specular[] = {0.25, 0.25, 0.25, 1};
+        glLightfv(GL_LIGHT0, GL_POSITION, light0Position);
+        glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, light0Diffuse);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, light0Specular);
 
-    CMAttitude *attitude = [self.motionManager deviceMotion].attitude;
-    if(! self.attitude0){
-        self.attitude0 = attitude;
-    }else{
-        [attitude multiplyByInverseOfAttitude:self.attitude0];
-        glRotatef(attitude.roll*2*180/M_PI, 0, 1, 0);
-        glRotatef(attitude.pitch*2*180/M_PI, 1, 0, 0);
-        glRotatef(attitude.yaw*2*180/M_PI, 0, 0, 1);
+        glEnable(GL_LIGHT1);
+        const GLfloat light1Position[] = {0, -1, 0, 1}; //pointing light, cutoff=360 degree
+        const GLfloat light1Direction[] = {0, 1, 0};
+        const GLfloat light1Diffuse[] = {0, 1, 0, 1}; //green light
+        const GLfloat light1Specular[] = {0.25, 1, 0.25, 1};
+        glLightfv(GL_LIGHT1, GL_POSITION, light1Position);
+        glLightfv(GL_LIGHT1, GL_SPOT_DIRECTION, light1Direction);
+        glLightfv(GL_LIGHT1, GL_AMBIENT, lightAmbient);
+        glLightfv(GL_LIGHT1, GL_DIFFUSE, light1Diffuse);
+        glLightfv(GL_LIGHT1, GL_SPECULAR, light1Specular);
+        
+//        glEnable(GL_COLOR_MATERIAL);
+        glDisable(GL_COLOR_MATERIAL);
+        const GLfloat materialAmbientAndDiffuse[] = {0.5, 0.5, 0.5};
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, materialAmbientAndDiffuse);
+        const GLfloat material[] = {1, 1, 1, 1};
+        glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, material);
+        glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 64);
+        
+
     }
-
     
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glColor4f(1, 0, 0, 1);
-    float isoValue = 1.0;
-    float gridSize = 0.05;
-    MarchingCube(isoValue, gridSize, -1, 1, -1, 1, -1, 1);
+    glTranslatef(0, 0, -2);
+    {
+        CMAttitude *attitude = [self.motionManager deviceMotion].attitude;
+        if(! self.attitude0){
+            self.attitude0 = attitude;
+        }else{
+            BOOL bRotating = YES;
+            if(bRotating){
+                [attitude multiplyByInverseOfAttitude:self.attitude0];
+                glRotatef(attitude.roll*2*180/M_PI, 0, 1, 0);
+                glRotatef(attitude.pitch*2*180/M_PI, 1, 0, 0);
+                glRotatef(attitude.yaw*2*180/M_PI, 0, 0, 1);
+            }
+        }
+        
+        glColor4f(1, 0, 0, 1);
+        float isoLevel = 1.0;
+        float gridSize = 0.1;
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY); //use uniform normal for each triangle facet
+        MarchingCube(isoLevel, gridSize, -1, 1, -1, 1, -1, 1);
+    }
 }
 
 
