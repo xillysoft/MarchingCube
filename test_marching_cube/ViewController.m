@@ -185,7 +185,7 @@
         
         glColor4f(1, 0, 0, 1);
         float isoLevel = 1.0;
-        float gridSize = 0.1;
+        float gridSize = 0.05;
         glEnableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY); //use uniform normal for each triangle facet
         MarchingCube(isoLevel, gridSize, -1, 1, -1, 1, -1, 1);

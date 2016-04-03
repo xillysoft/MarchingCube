@@ -56,7 +56,7 @@ void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, 
                 
                 GRIDCELL grid;
                 //build grid with 8 vertices, p[0], p[1],..., p[7]
-                int ijkOffset[8][3] = { //8 vertices; 3 elements (di, dj, dk) per vertex
+                static const int ijkOffset[8][3] = { //8 vertices; 3 elements (di, dj, dk) per vertex
                     {0, 0, 0}, //p0
                     {1, 0, 0}, //p1
                     {1, 1, 0}, //p2
@@ -147,7 +147,8 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
     //最后增加一个－1为三角形列表截至标志，故需要15+1=16项
     //trianglesTable每项为在12条边的索引
     //map: (v7,v6,...,v0)==>({e11,e10,...,e0});
-    const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
+    //trianglesTable[cubeIndex][k]∈{0..11}, 12 possible intersecting vertices
+    static const int trianglesTable[256][16] = /*-1 is the mark of triangle ending*/
     {{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}, /*cubIndex==0*/
         {0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
         {0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
@@ -465,6 +466,7 @@ int Polygonise(GRIDCELL grid,double isolevel,TRIANGLE triangles[5])
         i += 3;
         numTriangles++;
     }
+
     
     
     BOOL bDrawCubeOutline = NO;
