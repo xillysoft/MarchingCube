@@ -19,5 +19,5 @@ inline float distanceSquare(float x0, float y0, float z0, float x1, float y1, fl
 
 inline float distance(float x0, float y0, float z0, float x1, float y1, float z1)
 {
-    return sqrt(distanceSquare(x0, y0, z0, x1, y1, z1));
+    return sqrtf(distanceSquare(x0, y0, z0, x1, y1, z1));
 }

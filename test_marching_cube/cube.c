@@ -41,39 +41,47 @@ void MarchingCube(float isolevel, float gridSize, float X0, float X1, float Y0, 
                 const float cz0 = Z0+k*gridSize;
                 int offset = i+(k*(yCount+1)+j)*(xCount+1);
                 gridValues[offset] = metaball(cx0, cy0, cz0);
-                
             }
         }
     }
     
-    for(int i=0; i<xCount; i++){
+    GRIDCELL grid;
+    const int xOffStep = 1;
+    const int yOffStep = xCount+1;
+    const int zOffStep = (yCount+1)*(xCount+1);
+    for(int i=0, xOff=0; i<xCount; i++, xOff+=xOffStep){
         const float cx0 = X0+i*gridSize;
-        for(int j=0; j<yCount; j++){
+        grid.p[0].x = grid.p[3].x = grid.p[4].x = grid.p[7].x = cx0;
+        grid.p[1].x = grid.p[2].x = grid.p[5].x = grid.p[6].x = cx0 + gridSize;
+        for(int j=0, yOff=0; j<yCount; j++, yOff+=yOffStep){
             const float cy0 = Y0+j*gridSize;
-            for(int k=0; k<zCount; k++){
+            grid.p[0].y = grid.p[1].y = grid.p[4].y = grid.p[5].y = cy0;
+            grid.p[2].y = grid.p[3].y = grid.p[6].y = grid.p[7].y = cy0 + gridSize;
+            for(int k=0, zOff=0; k<zCount; k++, zOff+=zOffStep){
                 const float cz0 = Z0+k*gridSize;
-                int offset = i+(k*(yCount+1)+j)*(xCount+1);
-                
-                GRIDCELL grid;
+                grid.p[0].z = grid.p[1].z = grid.p[2].z = grid.p[3].z = cz0;
+                grid.p[4].z = grid.p[5].z = grid.p[6].z = grid.p[7].z = cz0+gridSize;
+                int offset = xOff+ yOff + zOff;
                 //build grid with 8 vertices, p[0], p[1],..., p[7]
-                static const int ijkOffset[8][3] = { //8 vertices; 3 elements (di, dj, dk) per vertex
-                    {0, 0, 0}, //p0
-                    {1, 0, 0}, //p1
-                    {1, 1, 0}, //p2
-                    {0, 1, 0}, //p3
-                    {0, 0, 1}, //p4
-                    {1, 0, 1}, //p5
-                    {1, 1, 1}, //p6
-                    {0, 1, 1}  //p7
-                };
+//                static const int ijkOffset[8][3] = { //8 vertices; 3 elements (di, dj, dk) per vertex
+//                    {0, 0, 0}, //p0:(x,y,z)
+//                    {1, 0, 0}, //p1
+//                    {1, 1, 0}, //p2
+//                    {0, 1, 0}, //p3
+//                    {0, 0, 1}, //p4
+//                    {1, 0, 1}, //p5
+//                    {1, 1, 1}, //p6
+//                    {0, 1, 1}  //p7
+//                };
                 
-                for(int iVertex=0; iVertex<8; iVertex++){
-                    grid.p[iVertex].x = cx0 + gridSize*ijkOffset[iVertex][0];
-                    grid.p[iVertex].y = cy0 + gridSize*ijkOffset[iVertex][1];
-                    grid.p[iVertex].z = cz0 + gridSize*ijkOffset[iVertex][2];
-                    
-                    grid.val[iVertex] = gridValues[offset + ijkOffset[iVertex][2]*(yCount+1)*(xCount+1) + ijkOffset[iVertex][1]*(xCount+1) +ijkOffset[iVertex][0]];
-                }
+                grid.val[0] = gridValues[offset];
+                grid.val[1] = gridValues[offset+xOffStep];
+                grid.val[2] = gridValues[offset+xOffStep+yOffStep];
+                grid.val[3] = gridValues[offset+yOffStep];
+                grid.val[4] = gridValues[offset+zOffStep];
+                grid.val[5] = gridValues[offset+xOffStep+zOffStep];
+                grid.val[6] = gridValues[offset+xOffStep+yOffStep+zOffStep];
+                grid.val[7] = gridValues[offset+yOffStep+zOffStep];
 
                 static TRIANGLE triangles[5]; //output triangles
                 int numTriangles = Polygonise(grid, isolevel, triangles);

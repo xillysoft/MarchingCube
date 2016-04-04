@@ -65,12 +65,11 @@
     
     [self.glkView addObserver:self forKeyPath:@"bounds" options:0 context:NULL];
     
-    
 }
 
 -(void)viewWillAppear:(BOOL)animated
 {
-    self.motionManager.deviceMotionUpdateInterval = 1.0/10.0;
+    self.motionManager.deviceMotionUpdateInterval = 1.0/20.0;
     [self.motionManager startDeviceMotionUpdatesUsingReferenceFrame:CMAttitudeReferenceFrameXArbitraryCorrectedZVertical toQueue:[NSOperationQueue mainQueue] withHandler:^(CMDeviceMotion *motion, NSError *error){
         [self.glkView setNeedsDisplay];
     }];
@@ -136,7 +135,7 @@
         const GLfloat lightModelAmbient[] = {0.25, 0.25, 0.25, 1};
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lightModelAmbient);
             
-        glEnable(GL_LIGHT0);
+//        glEnable(GL_LIGHT0);
         const GLfloat light0Position[] = {0, 0, 1, 0}; //vector light, 必须为单位矢量
         const GLfloat lightAmbient[] = {0, 0, 0, 1};
         const GLfloat light0Diffuse[] = {0.5, 0.5, 0.5, 1};
@@ -185,7 +184,7 @@
         
         glColor4f(1, 0, 0, 1);
         float isoLevel = 1.0;
-        float gridSize = 0.05;
+        float gridSize = 0.06;
         glEnableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_NORMAL_ARRAY); //use uniform normal for each triangle facet
         MarchingCube(isoLevel, gridSize, -1, 1, -1, 1, -1, 1);
